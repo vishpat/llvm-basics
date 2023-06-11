@@ -41,15 +41,12 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 }
-//
-// int a = 10;
-// int b = 20;
-//
-// int main(int argc, char **argv) {
-//     int c = a + b;
-//     printf("%d\n", c);
-//     return 0;
-// }
+
+// (define a 10) 
+// (define b 20)
+// (define c (+ a b)))    
+// (print c)    
+// (exit 0)
 
 fn main() {
     let context = Context::create();

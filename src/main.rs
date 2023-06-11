@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -34,10 +36,11 @@ const HG2G: f64 = 42.0;
 fn main() {
     let context = Context::create();
     let compiler = Compiler::new(&context);
-    let main_block =
-    compiler.context.append_basic_block(compiler.main_func, "entry");
+    let main_block = compiler
+        .context
+        .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
     let ret_val = compiler.f32_type.const_float(HG2G);
     compiler.builder.build_return(Some(&ret_val));
-    compiler.module.print_to_stderr();
+    compiler.module.print_to_file(Path::new("main.ll")).unwrap();
 }

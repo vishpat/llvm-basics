@@ -14,6 +14,7 @@ pub struct Compiler<'ctx> {
     pub builder: Builder<'ctx>,
     pub module: Module<'ctx>,
     pub i32_type: IntType<'ctx>,
+
     pub main_func: FunctionValue<'ctx>,
     pub printf_func: FunctionValue<'ctx>,
 }
@@ -48,18 +49,36 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
-    let ret_val = compiler.i32_type.const_int(0, false);
-    let hello_world_str = unsafe {
-        compiler
-            .builder
-            .build_global_string("Hello World\n", "hello_world")
-    };
 
+    let a = compiler.module.add_global(compiler.i32_type, None, "a");
+    a.set_initializer(&compiler.i32_type.const_int(10, false));
+
+    let b = compiler.module.add_global(compiler.i32_type, None, "b");
+    b.set_initializer(&compiler.i32_type.const_int(20, false));
+
+    let lhs = compiler
+        .module
+        .get_global("a")
+        .unwrap()
+        .get_initializer()
+        .unwrap();
+    let rhs = compiler
+        .module
+        .get_global("b")
+        .unwrap()
+        .get_initializer()
+        .unwrap();
+
+    let c = compiler
+        .builder
+        .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "c");
+    let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
     compiler.builder.build_call(
         compiler.printf_func,
-        &[hello_world_str.as_pointer_value().into()],
+        &[int_fmt_str.as_pointer_value().into(), c.into()],
         "printf",
     );
+    let ret_val = compiler.i32_type.const_int(0, false);
     compiler.builder.build_return(Some(&ret_val));
     compiler.module.print_to_file(Path::new("main.ll")).unwrap();
 }

@@ -48,12 +48,17 @@ impl<'ctx> Compiler<'ctx> {
 
 //
 // int main() {
-//  int a = 10;
-//
-//  {
-//      int b = 20;
-//      return a + b;
-//  }
+//     int a = 10;
+//     int b = 0;
+//     if (a > 0) {
+//        /* If block */
+//        b = 1;
+//     } else {
+//        /* Else block */
+//        b = 2;
+//     }
+//     /* Merge block */
+//     printf("%d\n", b);
 // }
 
 fn main() {
@@ -77,12 +82,11 @@ fn main() {
         },
     );
 
-    let env = Rc::new(RefCell::new(Env::new(Some(global_env.clone()))));
     let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(20, false));
-    env.borrow_mut().add(
+        .build_store(ptr, compiler.i32_type.const_int(0, false));
+    global_env.borrow_mut().add(
         "b",
         Pointer {
             ptr,
@@ -90,19 +94,69 @@ fn main() {
         },
     );
 
-    let a_ptr = env.borrow().get("a").unwrap().ptr;
+    let if_true_block = compiler
+        .context
+        .append_basic_block(compiler.main_func, "if_true");
+
+    let if_false_block = compiler
+        .context
+        .append_basic_block(compiler.main_func, "if_false");
+
+    let merge_block = compiler
+        .context
+        .append_basic_block(compiler.main_func, "merge");
+
+    let a_ptr = global_env.borrow().get("a").unwrap().ptr;
     let lhs = compiler.builder.build_load(compiler.i32_type, a_ptr, "a");
 
-    let b_ptr = env.borrow().get("b").unwrap().ptr;
-    let rhs = compiler.builder.build_load(compiler.i32_type, b_ptr, "b");
+    let comparison = compiler.builder.build_int_compare(
+        inkwell::IntPredicate::SGT,
+        lhs.into_int_value(),
+        compiler.i32_type.const_int(0, false),
+        "a > 0",
+    );
 
-    let c = compiler
+    compiler
         .builder
-        .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "c");
+        .build_conditional_branch(comparison, if_true_block, if_false_block);
+
+    // Generate code for if true block
+    compiler.builder.position_at_end(if_true_block);
+    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
+    compiler
+        .builder
+        .build_store(b_ptr, compiler.i32_type.const_int(1, false));
+    compiler.builder.build_unconditional_branch(merge_block);
+    let then_block = compiler.builder.get_insert_block().unwrap();
+
+    // Generate code for if false block
+    compiler.builder.position_at_end(if_false_block);
+    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
+    compiler
+        .builder
+        .build_store(b_ptr, compiler.i32_type.const_int(2, false));
+    compiler.builder.build_unconditional_branch(merge_block);
+    let else_block = compiler.builder.get_insert_block().unwrap();
+
+    // Generate code for merge block
+    compiler.builder.position_at_end(merge_block);
+    let phi = compiler.builder.build_phi(compiler.i32_type, "phi");
+    phi.add_incoming(&[
+        (&compiler.i32_type.const_int(1, false), then_block),
+        (&compiler.i32_type.const_int(2, false), else_block),
+    ]);
+    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
+    compiler
+        .builder
+        .build_store(b_ptr, phi.as_basic_value().into_int_value());
+
     let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
+
+    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
+    let b = compiler.builder.build_load(compiler.i32_type, b_ptr, "b");
     compiler.builder.build_call(
         compiler.printf_func,
-        &[int_fmt_str.as_pointer_value().into(), c.into()],
+        &[int_fmt_str.as_pointer_value().into(), b.into()],
         "printf",
     );
     let ret_val = compiler.i32_type.const_int(0, false);

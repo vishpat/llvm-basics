@@ -1,3 +1,5 @@
+mod env;
+use crate::env::*;
 use std::path::Path;
 
 use inkwell::builder::Builder;
@@ -6,6 +8,8 @@ use inkwell::module::Module;
 use inkwell::types::IntType;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const MAIN_FUNC_NAME: &str = "main";
 
@@ -45,8 +49,11 @@ impl<'ctx> Compiler<'ctx> {
 //
 // int main() {
 //  int a = 10;
-//  int b = 20;
-//  return a + b;
+//
+//  {
+//      int b = 20;
+//      return a + b;
+//  }
 // }
 
 fn main() {
@@ -56,18 +63,38 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
+    let global_env = Rc::new(RefCell::new(Env::new(None)));
 
     let ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
     compiler
         .builder
         .build_store(ptr, compiler.i32_type.const_int(10, false));
-    let lhs = compiler.builder.build_load(compiler.i32_type, ptr, "a");
+    global_env.borrow_mut().add(
+        "a",
+        Pointer {
+            ptr,
+            data_type: DataType::Number,
+        },
+    );
 
+    let env = Rc::new(RefCell::new(Env::new(Some(global_env.clone()))));
     let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
     compiler
         .builder
         .build_store(ptr, compiler.i32_type.const_int(20, false));
-    let rhs = compiler.builder.build_load(compiler.i32_type, ptr, "b");
+    env.borrow_mut().add(
+        "b",
+        Pointer {
+            ptr,
+            data_type: DataType::Number,
+        },
+    );
+
+    let a_ptr = env.borrow().get("a").unwrap().ptr;
+    let lhs = compiler.builder.build_load(compiler.i32_type, a_ptr, "a");
+
+    let b_ptr = env.borrow().get("b").unwrap().ptr;
+    let rhs = compiler.builder.build_load(compiler.i32_type, b_ptr, "b");
 
     let c = compiler
         .builder

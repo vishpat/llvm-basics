@@ -42,11 +42,12 @@ impl<'ctx> Compiler<'ctx> {
     }
 }
 
-// (define a 10) 
-// (define b 20)
-// (define c (+ a b)))    
-// (print c)    
-// (exit 0)
+//
+// int main() {
+//  int a = 10;
+//  int b = 20;
+//  return a + b;
+// }
 
 fn main() {
     let context = Context::create();
@@ -56,24 +57,17 @@ fn main() {
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
 
-    let a = compiler.module.add_global(compiler.i32_type, None, "a");
-    a.set_initializer(&compiler.i32_type.const_int(10, false));
+    let ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
+    compiler
+        .builder
+        .build_store(ptr, compiler.i32_type.const_int(10, false));
+    let lhs = compiler.builder.build_load(compiler.i32_type, ptr, "a");
 
-    let b = compiler.module.add_global(compiler.i32_type, None, "b");
-    b.set_initializer(&compiler.i32_type.const_int(20, false));
-
-    let lhs = compiler
-        .module
-        .get_global("a")
-        .unwrap()
-        .get_initializer()
-        .unwrap();
-    let rhs = compiler
-        .module
-        .get_global("b")
-        .unwrap()
-        .get_initializer()
-        .unwrap();
+    let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
+    compiler
+        .builder
+        .build_store(ptr, compiler.i32_type.const_int(20, false));
+    let rhs = compiler.builder.build_load(compiler.i32_type, ptr, "b");
 
     let c = compiler
         .builder

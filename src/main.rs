@@ -1,5 +1,3 @@
-mod env;
-use crate::env::*;
 use std::path::Path;
 
 use inkwell::builder::Builder;
@@ -8,8 +6,6 @@ use inkwell::module::Module;
 use inkwell::types::IntType;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const MAIN_FUNC_NAME: &str = "main";
 
@@ -47,116 +43,91 @@ impl<'ctx> Compiler<'ctx> {
 }
 
 //
+// int sum(int a, int b) {
+//     return a + b;
+// }
+//
 // int main() {
 //     int a = 10;
 //     int b = 0;
-//     if (a > 0) {
-//        /* If block */
-//        b = 1;
-//     } else {
-//        /* Else block */
-//        b = 2;
-//     }
-//     /* Merge block */
+//     int c = sum(a, b);
+//
 //     printf("%d\n", b);
 // }
 
 fn main() {
     let context = Context::create();
     let compiler = Compiler::new(&context);
+
+    let func_params = [compiler.i32_type.into(), compiler.i32_type.into()];
+
+    let func_type = compiler.i32_type.fn_type(&func_params, false);
+    let func = compiler.module.add_function("sum", func_type, None);
+    let current_bb = compiler.context.append_basic_block(func, "entry");
+    compiler.builder.position_at_end(current_bb);
+
+    let a_ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
+    compiler
+        .builder
+        .build_store(a_ptr, func.get_nth_param(0).unwrap());
+
+    let b_ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
+    compiler
+        .builder
+        .build_store(b_ptr, func.get_nth_param(1).unwrap());
+
+    let a = compiler
+        .builder
+        .build_load(compiler.i32_type, a_ptr, "a")
+        .into_int_value();
+    let b = compiler
+        .builder
+        .build_load(compiler.i32_type, b_ptr, "b")
+        .into_int_value();
+
+    let c = compiler.builder.build_int_add(a, b, "c");
+    compiler.builder.build_return(Some(&c));
+    compiler.builder.position_at_end(current_bb);
+
     let main_block = compiler
         .context
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
-    let global_env = Rc::new(RefCell::new(Env::new(None)));
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
+    let a_ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(10, false));
-    global_env.borrow_mut().add(
-        "a",
-        Pointer {
-            ptr,
-            data_type: DataType::Number,
-        },
-    );
+        .build_store(a_ptr, compiler.i32_type.const_int(10, false));
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
+    let b_ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(0, false));
-    global_env.borrow_mut().add(
-        "b",
-        Pointer {
-            ptr,
-            data_type: DataType::Number,
-        },
-    );
+        .build_store(a_ptr, compiler.i32_type.const_int(20, false));
 
-    let if_true_block = compiler
-        .context
-        .append_basic_block(compiler.main_func, "if_true");
-
-    let if_false_block = compiler
-        .context
-        .append_basic_block(compiler.main_func, "if_false");
-
-    let merge_block = compiler
-        .context
-        .append_basic_block(compiler.main_func, "merge");
-
-    let a_ptr = global_env.borrow().get("a").unwrap().ptr;
-    let lhs = compiler.builder.build_load(compiler.i32_type, a_ptr, "a");
-
-    let comparison = compiler.builder.build_int_compare(
-        inkwell::IntPredicate::SGT,
-        lhs.into_int_value(),
-        compiler.i32_type.const_int(0, false),
-        "a > 0",
-    );
-
-    compiler
+    let func_args = [
+        compiler
+            .builder
+            .build_load(compiler.i32_type, a_ptr, "a")
+            .into(),
+        compiler
+            .builder
+            .build_load(compiler.i32_type, b_ptr, "b")
+            .into(),
+    ];
+    let sum_func = compiler.module.get_function("sum").unwrap();
+    let c = compiler
         .builder
-        .build_conditional_branch(comparison, if_true_block, if_false_block);
-
-    // Generate code for if true block
-    compiler.builder.position_at_end(if_true_block);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
-    compiler
-        .builder
-        .build_store(b_ptr, compiler.i32_type.const_int(1, false));
-    compiler.builder.build_unconditional_branch(merge_block);
-    let then_block = compiler.builder.get_insert_block().unwrap();
-
-    // Generate code for if false block
-    compiler.builder.position_at_end(if_false_block);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
-    compiler
-        .builder
-        .build_store(b_ptr, compiler.i32_type.const_int(2, false));
-    compiler.builder.build_unconditional_branch(merge_block);
-    let else_block = compiler.builder.get_insert_block().unwrap();
-
-    // Generate code for merge block
-    compiler.builder.position_at_end(merge_block);
-    let phi = compiler.builder.build_phi(compiler.i32_type, "phi");
-    phi.add_incoming(&[
-        (&compiler.i32_type.const_int(1, false), then_block),
-        (&compiler.i32_type.const_int(2, false), else_block),
-    ]);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
-    compiler
-        .builder
-        .build_store(b_ptr, phi.as_basic_value().into_int_value());
+        .build_call(sum_func, &func_args, "sum")
+        .try_as_basic_value()
+        .left()
+        .unwrap()
+        .into_int_value();
 
     let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
 
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
-    let b = compiler.builder.build_load(compiler.i32_type, b_ptr, "b");
     compiler.builder.build_call(
         compiler.printf_func,
-        &[int_fmt_str.as_pointer_value().into(), b.into()],
+        &[int_fmt_str.as_pointer_value().into(), c.into()],
         "printf",
     );
     let ret_val = compiler.i32_type.const_int(0, false);

@@ -1,5 +1,10 @@
 [workspace]
 members = [
   "llvm-ret",
-  "llvm-print"
+  "llvm-print",
+  "llvm-global-vars",
+  "llvm-local-vars",
+  "llvm-scope",
+  "llvm-if-else",
+  "llvm-function"
 ]

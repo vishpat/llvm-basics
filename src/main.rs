@@ -102,7 +102,7 @@ fn main() {
     let b_ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
     compiler
         .builder
-        .build_store(a_ptr, compiler.i32_type.const_int(20, false));
+        .build_store(b_ptr, compiler.i32_type.const_int(20, false));
 
     let func_args = [
         compiler

@@ -4,6 +4,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::IntType;
+use inkwell::types::StructType;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
 
@@ -14,7 +15,7 @@ pub struct Compiler<'ctx> {
     pub builder: Builder<'ctx>,
     pub module: Module<'ctx>,
     pub i32_type: IntType<'ctx>,
-
+    pub point_type: StructType<'ctx>,
     pub main_func: FunctionValue<'ctx>,
     pub printf_func: FunctionValue<'ctx>,
 }
@@ -30,6 +31,7 @@ impl<'ctx> Compiler<'ctx> {
             i32_type.fn_type(&[i32_type.ptr_type(AddressSpace::default()).into()], true),
             None,
         );
+        let point_type = context.struct_type(&[i32_type.into(), i32_type.into()], false);
 
         Compiler {
             context,
@@ -38,17 +40,26 @@ impl<'ctx> Compiler<'ctx> {
             i32_type,
             main_func,
             printf_func,
+            point_type,
         }
     }
 }
 
 //
+// struct Point {
+//    int a;
+//    int b;
+// };
+//
 // int main() {
-//  int a = 10;
-//  int b = 20;
-//  return a + b;
+//    struct Point p;
+//    p.a = 10;
+//    p.b = 20;
+//    int c = p.a + p.b;
+//    printf("%d\n", c);
+//    return 0;
 // }
-
+//
 fn main() {
     let context = Context::create();
     let compiler = Compiler::new(&context);
@@ -57,28 +68,52 @@ fn main() {
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
-    compiler
-        .builder
-        .build_store(ptr, compiler.i32_type.const_int(10, false));
-    let lhs = compiler.builder.build_load(compiler.i32_type, ptr, "a");
+    let point = compiler.builder.build_alloca(compiler.point_type, "p");
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
+    let a = compiler
+        .builder
+        .build_struct_gep(compiler.point_type, point, 0, "a");
+    let a = match a {
+        Ok(a) => a,
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
+    };
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(20, false));
-    let rhs = compiler.builder.build_load(compiler.i32_type, ptr, "b");
+        .build_store(a, compiler.i32_type.const_int(10, false));
+
+    let b = compiler
+        .builder
+        .build_struct_gep(compiler.point_type, point, 1, "b");
+    let b = match b {
+        Ok(b) => b,
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
+    };
+    compiler
+        .builder
+        .build_store(b, compiler.i32_type.const_int(20, false));
+
+    let a = compiler.builder.build_load(compiler.i32_type, a, "a");
+    let b = compiler.builder.build_load(compiler.i32_type, b, "b");
 
     let c = compiler
         .builder
-        .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "c");
+        .build_int_add(a.into_int_value(), b.into_int_value(), "c");
+
     let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
     compiler.builder.build_call(
         compiler.printf_func,
         &[int_fmt_str.as_pointer_value().into(), c.into()],
         "printf",
     );
-    let ret_val = compiler.i32_type.const_int(0, false);
-    compiler.builder.build_return(Some(&ret_val));
+
+    compiler
+        .builder
+        .build_return(Some(&compiler.i32_type.const_int(0, false)));
     compiler.module.print_to_file(Path::new("main.ll")).unwrap();
 }

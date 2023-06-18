@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "llvm-ret",
+  "llvm-hello-world",
   "llvm-print",
   "llvm-global-vars",
   "llvm-local-vars",

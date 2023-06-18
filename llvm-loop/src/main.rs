@@ -75,6 +75,8 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "loop_end");
 
+    compiler.builder.build_unconditional_branch(cond_block);
+
     compiler.builder.position_at_end(cond_block);
     let lhs = compiler.builder.build_load(compiler.i32_type, ptr, "a");
     let comparison = compiler.builder.build_int_compare(
@@ -105,14 +107,11 @@ fn main() {
         &[int_fmt_str.as_pointer_value().into(), a.into()],
         "printf",
     );
+
+    compiler.builder.build_unconditional_branch(cond_block);
+
     // Generate code for merge block
     compiler.builder.position_at_end(loop_end_block);
-
-    let phi = compiler.builder.build_phi(compiler.i32_type, "phi");
-    phi.add_incoming(&[
-        (&compiler.i32_type.const_int(1, false), body_block),
-        (&compiler.i32_type.const_int(2, false), loop_end_block),
-    ]);
 
     let ret_val = compiler.i32_type.const_int(0, false);
     compiler.builder.build_return(Some(&ret_val));

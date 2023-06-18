@@ -6,6 +6,8 @@ members = [
   "llvm-local-vars",
   "llvm-scope",
   "llvm-if-else",
+  "llvm-loop",
   "llvm-function",
-  "llvm-structs"
+  "llvm-structs",
+  "llvm-structs-heap"
 ]

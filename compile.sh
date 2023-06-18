@@ -3,6 +3,7 @@
 rm -f main main.ll
 export RUST_LOG=debug
 set -x
-cargo run 
-lli main.ll
+cargo run --bin $1 
+clang -o main main.ll
+./main
 echo $?

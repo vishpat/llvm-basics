@@ -48,7 +48,7 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
-    let ret_val = compiler.i32_type.const_int(0, false);
+
     let hello_world_str = unsafe {
         compiler
             .builder
@@ -60,6 +60,7 @@ fn main() {
         &[hello_world_str.as_pointer_value().into()],
         "printf",
     );
+    let ret_val = compiler.i32_type.const_int(0, false);
     compiler.builder.build_return(Some(&ret_val));
     compiler.module.print_to_file(Path::new("main.ll")).unwrap();
 }

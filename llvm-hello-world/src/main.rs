@@ -6,6 +6,7 @@ use inkwell::module::Module;
 use inkwell::types::IntType;
 use inkwell::values::FunctionValue;
 
+const MAIN_MODULE_NAME: &str = "main";
 const MAIN_FUNC_NAME: &str = "main";
 
 pub struct Compiler<'ctx> {
@@ -19,7 +20,7 @@ pub struct Compiler<'ctx> {
 impl<'ctx> Compiler<'ctx> {
     pub fn new(context: &'ctx Context) -> Self {
         let builder = context.create_builder();
-        let module = context.create_module(MAIN_FUNC_NAME);
+        let module = context.create_module(MAIN_MODULE_NAME);
         let i32_type = context.i32_type();
         let main_func = module.add_function(MAIN_FUNC_NAME, i32_type.fn_type(&[], false), None);
         Compiler {
@@ -33,6 +34,13 @@ impl<'ctx> Compiler<'ctx> {
 }
 
 const HG2G: u64 = 108;
+
+//
+// int main() {
+//     return 108;
+// }
+//
+
 fn main() {
     let context = Context::create();
     let compiler = Compiler::new(&context);

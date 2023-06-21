@@ -81,7 +81,8 @@ fn main() {
     let c = compiler
         .builder
         .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "c");
-    let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
+    let int_fmt_str = unsafe { 
+        compiler.builder.build_global_string("%d\n", "int_fmt_str") };
     compiler.builder.build_call(
         compiler.printf_func,
         &[int_fmt_str.as_pointer_value().into(), c.into()],

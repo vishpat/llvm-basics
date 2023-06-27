@@ -52,8 +52,10 @@ impl<'ctx> Compiler<'ctx> {
 //
 //  {
 //      int b = 20;
-//      return a + b;
+//      c = a + b;
+//      printf("%d\n", c);
 //  }
+//  return 0;
 // }
 
 fn main() {

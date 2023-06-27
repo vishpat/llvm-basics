@@ -4,7 +4,7 @@ members = [
   "llvm-print",
   "llvm-global-vars",
   "llvm-local-vars",
-  "llvm-scope",
+  "llvm-environment",
   "llvm-if-else",
   "llvm-loop",
   "llvm-function",

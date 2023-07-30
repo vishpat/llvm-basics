@@ -1,5 +1,3 @@
-mod env;
-use crate::env::*;
 use std::path::Path;
 
 use inkwell::builder::Builder;
@@ -8,8 +6,6 @@ use inkwell::module::Module;
 use inkwell::types::IntType;
 use inkwell::values::FunctionValue;
 use inkwell::AddressSpace;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const MAIN_FUNC_NAME: &str = "main";
 
@@ -68,31 +64,16 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "entry");
     compiler.builder.position_at_end(main_block);
-    let global_env = Rc::new(RefCell::new(Env::new(None)));
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
+    let a_ptr = compiler.builder.build_alloca(compiler.i32_type, "a");
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(10, false));
-    global_env.borrow_mut().add(
-        "a",
-        Pointer {
-            ptr,
-            data_type: DataType::Number,
-        },
-    );
+        .build_store(a_ptr, compiler.i32_type.const_int(10, false));
 
-    let ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
+    let b_ptr = compiler.builder.build_alloca(compiler.i32_type, "b");
     compiler
         .builder
-        .build_store(ptr, compiler.i32_type.const_int(0, false));
-    global_env.borrow_mut().add(
-        "b",
-        Pointer {
-            ptr,
-            data_type: DataType::Number,
-        },
-    );
+        .build_store(b_ptr, compiler.i32_type.const_int(0, false));
 
     let if_true_block = compiler
         .context
@@ -106,7 +87,6 @@ fn main() {
         .context
         .append_basic_block(compiler.main_func, "merge");
 
-    let a_ptr = global_env.borrow().get("a").unwrap().ptr;
     let lhs = compiler.builder.build_load(compiler.i32_type, a_ptr, "a");
 
     let comparison = compiler.builder.build_int_compare(
@@ -122,7 +102,6 @@ fn main() {
 
     // Generate code for if true block
     compiler.builder.position_at_end(if_true_block);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
     compiler
         .builder
         .build_store(b_ptr, compiler.i32_type.const_int(1, false));
@@ -131,7 +110,6 @@ fn main() {
 
     // Generate code for if false block
     compiler.builder.position_at_end(if_false_block);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
     compiler
         .builder
         .build_store(b_ptr, compiler.i32_type.const_int(2, false));
@@ -145,14 +123,12 @@ fn main() {
         (&compiler.i32_type.const_int(1, false), then_block),
         (&compiler.i32_type.const_int(2, false), else_block),
     ]);
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
     compiler
         .builder
         .build_store(b_ptr, phi.as_basic_value().into_int_value());
 
     let int_fmt_str = unsafe { compiler.builder.build_global_string("%d\n", "int_fmt_str") };
 
-    let b_ptr = global_env.borrow().get("b").unwrap().ptr;
     let b = compiler.builder.build_load(compiler.i32_type, b_ptr, "b");
     compiler.builder.build_call(
         compiler.printf_func,

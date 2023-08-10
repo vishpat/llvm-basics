@@ -87,7 +87,6 @@ fn main() {
 
     let c = compiler.builder.build_int_add(a, b, "c");
     compiler.builder.build_return(Some(&c));
-    compiler.builder.position_at_end(current_bb);
 
     let main_block = compiler
         .context

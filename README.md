@@ -9,3 +9,5 @@ To run a particular example and generate the LLVM IR use the following command
 ```bash
 cargo run --bin <project name>
 ```
+
+Using Vscode, you can run the programs inside a dev container with the installed dependencies

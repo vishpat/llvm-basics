@@ -8,6 +8,5 @@ members = [
   "llvm-if-else",
   "llvm-loop",
   "llvm-function",
-  "llvm-structs",
-  "llvm-structs-heap"
+  "llvm-structs"
 ]
